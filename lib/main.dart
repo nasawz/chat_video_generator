@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter/return_code.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -61,9 +62,54 @@ class _ChatScreenState extends State<ChatScreen> {
   // 添加速度控制变量
   double _animationSpeed = 1.0; // 默认速度为1.0
 
+  // ���加界面控制相关的状态变量
+  Color _leftBubbleColor = Colors.grey[300]!;
+  Color _rightBubbleColor = Colors.blue[100]!;
+  Color _leftTextColor = Colors.black;
+  Color _rightTextColor = Colors.black;
+  double _bubbleRadius = 20.0;
+  double _fontSize = 20.0;
+
+  // 添加颜色选择器对话框
+  Future<Color?> _showColorPicker(BuildContext context, Color initialColor) {
+    return showDialog<Color>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('选择颜色'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: initialColor,
+              onColorChanged: (Color color) {
+                initialColor = color;
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('取消'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('确定'),
+              onPressed: () => Navigator.of(context).pop(initialColor),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 添加一个方法来确保值在范围内
+  double _clampFontSize(double value) {
+    return value.clamp(20.0, 48.0);
+  }
+
   @override
   void initState() {
     super.initState();
+    // 确保初始值在有效范围内
+    _fontSize = _clampFontSize(_fontSize);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
@@ -292,12 +338,11 @@ class _ChatScreenState extends State<ChatScreen> {
         double y = currentY;
         for (final layout in messageLayouts) {
           if (y + layout.height > 0 && y < frameSize) {
-            // 只绘制可见区域内的消息
             final x = layout.message.isLeft
                 ? 40.0
                 : frameSize - layout.textPainter.width - 40;
 
-            // 绘制气泡背景
+            // 使用自定义颜色绘制气泡
             final bubblePath = Path()
               ..addRRect(RRect.fromRectAndRadius(
                 Rect.fromLTWH(
@@ -306,25 +351,25 @@ class _ChatScreenState extends State<ChatScreen> {
                   layout.textPainter.width + 40,
                   layout.height,
                 ),
-                const Radius.circular(20),
+                Radius.circular(_bubbleRadius),
               ));
 
             canvas.drawPath(
               bubblePath,
               Paint()
-                ..color = layout.message.isLeft
-                    ? Colors.grey[300]!
-                    : Colors.blue[100]!
+                ..color =
+                    layout.message.isLeft ? _leftBubbleColor : _rightBubbleColor
                 ..style = PaintingStyle.fill,
             );
 
-            // 修改这里：重新创建TextPainter并设置文字颜色
+            // 使用自定义颜色和字体大小绘制文字
             final textPainter = TextPainter(
               text: TextSpan(
                 text: '${layout.message.sender}: ${layout.message.message}',
-                style: const TextStyle(
-                  fontSize: 32,
-                  color: Colors.black, // 设置文字颜色为黑色
+                style: TextStyle(
+                  fontSize: _fontSize,
+                  color:
+                      layout.message.isLeft ? _leftTextColor : _rightTextColor,
                 ),
               ),
               textDirection: TextDirection.ltr,
@@ -386,7 +431,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final session = await FFmpegKit.execute(command);
       final returnCode = await session.getReturnCode();
 
-      // 获取完整的输出和日志
+      // 获取完整的���出和日志
       final output = await session.getOutput();
       final logs = await session.getLogs();
       print('FFmpeg complete output:');
@@ -483,6 +528,145 @@ class _ChatScreenState extends State<ChatScreen> {
             color: _isGenerating ? Colors.orange : null,
             onPressed: _generateVideo,
           ),
+          // 添加设置按钮
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (BuildContext context) {
+                  return StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setModalState) {
+                      return SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            ListTile(
+                              title: const Text('左侧气泡颜色'),
+                              trailing: Container(
+                                width: 24,
+                                height: 24,
+                                color: _leftBubbleColor,
+                              ),
+                              onTap: () async {
+                                final color = await _showColorPicker(
+                                    context, _leftBubbleColor);
+                                if (color != null) {
+                                  setState(() => _leftBubbleColor = color);
+                                  setModalState(() {});
+                                }
+                              },
+                            ),
+                            ListTile(
+                              title: const Text('右侧气泡颜色'),
+                              trailing: Container(
+                                width: 24,
+                                height: 24,
+                                color: _rightBubbleColor,
+                              ),
+                              onTap: () async {
+                                final color = await _showColorPicker(
+                                    context, _rightBubbleColor);
+                                if (color != null) {
+                                  setState(() => _rightBubbleColor = color);
+                                  setModalState(() {});
+                                }
+                              },
+                            ),
+                            ListTile(
+                              title: const Text('左侧文字颜色'),
+                              trailing: Container(
+                                width: 24,
+                                height: 24,
+                                color: _leftTextColor,
+                              ),
+                              onTap: () async {
+                                final color = await _showColorPicker(
+                                    context, _leftTextColor);
+                                if (color != null) {
+                                  setState(() => _leftTextColor = color);
+                                  setModalState(() {});
+                                }
+                              },
+                            ),
+                            ListTile(
+                              title: const Text('右侧文字颜色'),
+                              trailing: Container(
+                                width: 24,
+                                height: 24,
+                                color: _rightTextColor,
+                              ),
+                              onTap: () async {
+                                final color = await _showColorPicker(
+                                    context, _rightTextColor);
+                                if (color != null) {
+                                  setState(() => _rightTextColor = color);
+                                  setModalState(() {});
+                                }
+                              },
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('气泡圆角'),
+                                      Text(
+                                          '${_bubbleRadius.toStringAsFixed(1)}'),
+                                    ],
+                                  ),
+                                  Slider(
+                                    value: _bubbleRadius,
+                                    min: 0,
+                                    max: 40,
+                                    divisions: 40,
+                                    label: _bubbleRadius.toStringAsFixed(1),
+                                    onChanged: (value) {
+                                      setState(() => _bubbleRadius = value);
+                                      setModalState(() {});
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('字体大小'),
+                                      Text('${_fontSize.toStringAsFixed(1)}'),
+                                    ],
+                                  ),
+                                  Slider(
+                                    value: _fontSize,
+                                    min: 20.0,
+                                    max: 48.0,
+                                    divisions: 28,
+                                    label: _fontSize.toStringAsFixed(1),
+                                    onChanged: (value) {
+                                      setState(() =>
+                                          _fontSize = _clampFontSize(value));
+                                      setModalState(() {});
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
         ],
         // 添加进度条
         bottom: _isGenerating
@@ -541,7 +725,15 @@ class _ChatScreenState extends State<ChatScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                return ChatBubble(message: message);
+                return ChatBubble(
+                  message: message,
+                  leftBubbleColor: _leftBubbleColor,
+                  rightBubbleColor: _rightBubbleColor,
+                  leftTextColor: _leftTextColor,
+                  rightTextColor: _rightTextColor,
+                  bubbleRadius: _bubbleRadius,
+                  fontSize: _fontSize,
+                );
               },
             ),
           ),
@@ -565,8 +757,23 @@ class ChatMessage {
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
+  final Color leftBubbleColor;
+  final Color rightBubbleColor;
+  final Color leftTextColor;
+  final Color rightTextColor;
+  final double bubbleRadius;
+  final double fontSize;
 
-  const ChatBubble({super.key, required this.message});
+  const ChatBubble({
+    super.key,
+    required this.message,
+    required this.leftBubbleColor,
+    required this.rightBubbleColor,
+    required this.leftTextColor,
+    required this.rightTextColor,
+    required this.bubbleRadius,
+    required this.fontSize,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -583,21 +790,28 @@ class ChatBubble extends StatelessWidget {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: message.isLeft ? Colors.grey[300] : Colors.blue[100],
-              borderRadius: BorderRadius.circular(20),
+              color: message.isLeft ? leftBubbleColor : rightBubbleColor,
+              borderRadius: BorderRadius.circular(bubbleRadius),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   message.sender,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontSize: fontSize * 0.375, // 保持发送者名字较小
+                    color: message.isLeft ? leftTextColor : rightTextColor,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(message.message),
+                Text(
+                  message.message,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    color: message.isLeft ? leftTextColor : rightTextColor,
+                  ),
+                ),
               ],
             ),
           ),
