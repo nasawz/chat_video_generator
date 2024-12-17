@@ -340,7 +340,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 2. 生成每一帧的图片
       // 使用1:1的正方形尺寸
-      final frameSize = 1080.0; // 1080x1080 是社交媒体常用的尺寸
+      const frameWidth = 720.0; // 宽度设为720px
+      const frameHeight = 1280.0; // 高度设为1280px，保持9:16比例
 
       // 计算所有消息的总高度
       double totalHeight = 0;
@@ -358,7 +359,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           textDirection: TextDirection.ltr,
         );
-        senderTextPainter.layout(maxWidth: frameSize * 0.8);
+        senderTextPainter.layout(maxWidth: frameWidth * 0.8);
 
         final messageTextPainter = TextPainter(
           text: TextSpan(
@@ -370,7 +371,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           textDirection: TextDirection.ltr,
         );
-        messageTextPainter.layout(maxWidth: frameSize * 0.8);
+        messageTextPainter.layout(maxWidth: frameWidth * 0.8);
 
         final messageHeight =
             senderTextPainter.height + 4 + messageTextPainter.height + 20;
@@ -385,7 +386,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       // 根据内容计算所需的标准帧数
-      final int baseFrames = _calculateBaseFrames(totalHeight, frameSize);
+      final int baseFrames = _calculateBaseFrames(totalHeight, frameWidth);
       final int totalFrames = (baseFrames / _animationSpeed).round();
 
       print('Total height: $totalHeight px');
@@ -403,22 +404,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
         // 绘制白色背景
         canvas.drawRect(
-          Rect.fromLTWH(0, 0, frameSize, frameSize),
+          Rect.fromLTWH(0, 0, frameWidth, frameHeight),
           Paint()..color = Colors.white,
         );
 
         // 计算当前帧的垂直偏移
         final progress = frame / (totalFrames - 1);
-        final currentY = frameSize - (totalHeight + frameSize * 0.1) * progress;
+        final currentY =
+            frameHeight - (totalHeight + frameHeight * 0.1) * progress;
 
         // 绘制所有消息
         double y = currentY;
         for (final layout in messageLayouts) {
-          if (y + layout.height > 0 && y < frameSize) {
-            // 计算基础x坐标
+          if (y + layout.height > 0 && y < frameHeight) {
+            // 调整基础x坐标，增加头像与气泡之间的间距
             final baseX = layout.message.isLeft
-                ? 80.0 // 左侧消息：40(边距) + 40(头像空间)
-                : frameSize -
+                ? 80.0 // 40(头像) + 40(间距)
+                : frameWidth -
                     max(layout.senderTextPainter.width,
                         layout.messageTextPainter.width) -
                     80;
@@ -427,7 +429,7 @@ class _ChatScreenState extends State<ChatScreen> {
             final avatarImage = await loadImage(layout.message.avatar);
             final avatarRect = Rect.fromCircle(
               center: Offset(
-                layout.message.isLeft ? 40 : frameSize - 40,
+                layout.message.isLeft ? 30 : frameWidth - 30, // 头像位置
                 y + 20,
               ),
               radius: 20,
@@ -481,9 +483,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 ..style = PaintingStyle.fill,
             );
 
-            // 绘制��息文本
-            layout.messageTextPainter.paint(canvas,
-                Offset(baseX, y + layout.senderTextPainter.height + 14));
+            // 绘制消息文本
+            layout.messageTextPainter.paint(
+              canvas,
+              Offset(baseX, y + layout.senderTextPainter.height + 14),
+            );
           }
           y += layout.height + 20;
         }
@@ -491,7 +495,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // 保存帧
         final picture = recorder.endRecording();
         final image =
-            await picture.toImage(frameSize.toInt(), frameSize.toInt());
+            await picture.toImage(frameWidth.toInt(), frameHeight.toInt());
         final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
         final buffer = byteData!.buffer.asUint8List();
 
@@ -521,7 +525,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await outputDir.create(recursive: true);
       }
 
-      // 更新FFmpeg命令，确保使用正确的帧率
+      // 更新FFmpeg命令以���用新的尺寸
       final command = '''
         -y \
         -f image2 \
@@ -529,6 +533,7 @@ class _ChatScreenState extends State<ChatScreen> {
         -i ${framesDir.path}/frame_%04d.png \
         -c:v mpeg4 \
         -q:v 1 \
+        -vf "scale=720:1280" \
         -pix_fmt yuv420p \
         ${_currentVideoPath}
       '''
