@@ -40,13 +40,17 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _currentVideoPath;
   final GlobalKey _chatKey = GlobalKey();
 
-  // 示例��据
+  // 示例数据
   final List<ChatMessage> _messages = [
     ChatMessage(sender: "用户A", message: "你好！", isLeft: true),
     ChatMessage(sender: "用户B", message: "你好！很高兴见到你。", isLeft: false),
     ChatMessage(sender: "用户A", message: "今天天气真不错。", isLeft: true),
     ChatMessage(sender: "用户B", message: "是的，阳光明媚。", isLeft: false),
   ];
+
+  // 添加进度变量
+  double _generationProgress = 0.0;
+  String _progressText = '';
 
   @override
   void initState() {
@@ -187,7 +191,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_isGenerating) return;
 
     try {
-      setState(() => _isGenerating = true);
+      setState(() {
+        _isGenerating = true;
+        _generationProgress = 0.0;
+        _progressText = '准备生成...';
+      });
 
       // 1. 创建临时目录存放帧图片
       final tempDir = await getTemporaryDirectory();
@@ -288,7 +296,18 @@ class _ChatScreenState extends State<ChatScreen> {
         final frameFile = File(
             '${framesDir.path}/frame_${frame.toString().padLeft(4, '0')}.png');
         await frameFile.writeAsBytes(buffer);
+
+        // 更新进度
+        setState(() {
+          _generationProgress = (frame + 1) / totalFrames * 0.8; // 帧生成占80%进度
+          _progressText = '生成帧 ${frame + 1}/$totalFrames';
+        });
       }
+
+      setState(() {
+        _progressText = '正在合成视频...';
+        _generationProgress = 0.8; // 开始FFmpeg处理
+      });
 
       // 3. 使用FFmpeg将图片序列转换为视频
       _currentVideoPath = await _getVideoSavePath();
@@ -329,6 +348,11 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (ReturnCode.isSuccess(returnCode)) {
+        setState(() {
+          _progressText = '保存视频文件...';
+          _generationProgress = 0.9;
+        });
+
         print('Video generation completed successfully');
 
         // 检查生成的视频文件
@@ -390,7 +414,11 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } finally {
-      setState(() => _isGenerating = false);
+      setState(() {
+        _isGenerating = false;
+        _generationProgress = 0.0;
+        _progressText = '';
+      });
     }
   }
 
@@ -407,6 +435,24 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: _generateVideo,
           ),
         ],
+        // 添加进度条
+        bottom: _isGenerating
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(4.0),
+                child: Column(
+                  children: [
+                    LinearProgressIndicator(value: _generationProgress),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        _progressText,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : null,
       ),
       body: ListView.builder(
         key: _chatKey,
