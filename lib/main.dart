@@ -318,8 +318,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 ..style = PaintingStyle.fill,
             );
 
-            // 绘制文本
-            layout.textPainter.paint(canvas, Offset(x, y + 20));
+            // 修改这里：重新创建TextPainter并设置文字颜色
+            final textPainter = TextPainter(
+              text: TextSpan(
+                text: '${layout.message.sender}: ${layout.message.message}',
+                style: const TextStyle(
+                  fontSize: 32,
+                  color: Colors.black, // 设置文字颜色为黑色
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            );
+            textPainter.layout(maxWidth: frameSize * 0.8);
+            textPainter.paint(canvas, Offset(x, y + 20));
           }
           y += layout.height + 20;
         }
@@ -350,7 +361,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // 3. 使用FFmpeg将图片序列转换为视频
       _currentVideoPath = await _getVideoSavePath();
 
-      // 确保输出目���存在
+      // 确保输出目录存在
       final outputDir = Directory(
           _currentVideoPath!.substring(0, _currentVideoPath!.lastIndexOf('/')));
       if (!await outputDir.exists()) {
@@ -393,7 +404,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
         print('Video generation completed successfully');
 
-        // 检查生���的视频文件
+        // 检查生成的视频文件
         final videoFile = File(_currentVideoPath!);
         final videoExists = await videoFile.exists();
         final videoSize = await videoFile.length();
