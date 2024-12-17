@@ -415,9 +415,9 @@ class _ChatScreenState extends State<ChatScreen> {
         double y = currentY;
         for (final layout in messageLayouts) {
           if (y + layout.height > 0 && y < frameSize) {
-            // 计算基础x坐标，考虑头像空间
+            // 计算基础x坐标
             final baseX = layout.message.isLeft
-                ? 80.0 // 40(边距) + 40(头像空间)
+                ? 80.0 // 左侧消息：40(边距) + 40(头像空间)
                 : frameSize -
                     max(layout.senderTextPainter.width,
                         layout.messageTextPainter.width) -
@@ -446,8 +446,14 @@ class _ChatScreenState extends State<ChatScreen> {
             );
             canvas.restore();
 
-            // 绘制用户名
-            layout.senderTextPainter.paint(canvas, Offset(baseX, y));
+            // 绘制用户名 - 根据是否为左侧消息调整x坐标
+            final senderX = layout.message.isLeft
+                ? baseX
+                : baseX +
+                    max(layout.senderTextPainter.width,
+                        layout.messageTextPainter.width) -
+                    layout.senderTextPainter.width;
+            layout.senderTextPainter.paint(canvas, Offset(senderX, y));
 
             // 绘制气泡
             final bubblePath = Path();
@@ -945,7 +951,7 @@ class ChatBubble extends StatelessWidget {
               ),
             ),
           ),
-          // 消息行
+          // 消���行
           Row(
             mainAxisAlignment: message.isLeft
                 ? MainAxisAlignment.start
