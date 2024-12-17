@@ -9,6 +9,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:ui' as ui;
 import 'dart:math';
 import 'package:flutter/services.dart';
+import 'package:screenshot/screenshot.dart';
 
 void main() {
   runApp(const MyApp());
@@ -155,7 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 添加一个方法来确保值在围内
+  // 添加一个方法来���保值在围内
   double _clampFontSize(double value) {
     return value.clamp(20.0, 48.0);
   }
@@ -163,6 +164,9 @@ class _ChatScreenState extends State<ChatScreen> {
   double _clampSenderFontSize(double value) {
     return value.clamp(12.0, 24.0);
   }
+
+  // 添加 ScreenshotController
+  final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
   void initState() {
@@ -343,7 +347,7 @@ class _ChatScreenState extends State<ChatScreen> {
       const frameWidth = 720.0; // 宽度设为720px
       const frameHeight = 1280.0; // 高度设为1280px，保持9:16比例
 
-      // 计算所有消息的总高度
+      // 计算所有消息���总高度
       double totalHeight = 0;
       final List<_MessageLayout> messageLayouts = [];
 
@@ -525,7 +529,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await outputDir.create(recursive: true);
       }
 
-      // 更新FFmpeg命令以���用新的尺寸
+      // 更新FFmpeg命令以用新的尺寸
       final command = '''
         -y \
         -f image2 \
@@ -644,6 +648,11 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('对话视频生成器'),
         actions: [
+          // 添加截图按钮
+          IconButton(
+            icon: const Icon(Icons.camera_alt),
+            onPressed: _saveScreenshot,
+          ),
           IconButton(
             icon: Icon(
                 _isGenerating ? Icons.hourglass_empty : Icons.movie_creation),
@@ -679,7 +688,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               },
                             ),
                             ListTile(
-                              title: const Text('右侧气泡颜色'),
+                              title: const Text('右侧���泡颜色'),
                               trailing: Container(
                                 width: 24,
                                 height: 24,
@@ -866,31 +875,93 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-          // 聊天列表现在需要放在Expanded中
+          // 将聊天列表包装在 Screenshot widget 中
           Expanded(
-            child: ListView.builder(
-              key: _chatKey,
+            child: SingleChildScrollView(
               controller: _scrollController,
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return ChatBubble(
-                  message: message,
-                  leftBubbleColor: _leftBubbleColor,
-                  rightBubbleColor: _rightBubbleColor,
-                  leftTextColor: _leftTextColor,
-                  rightTextColor: _rightTextColor,
-                  bubbleRadius: _bubbleRadius,
-                  fontSize: _fontSize,
-                  senderFontSize: _senderFontSize,
-                );
-              },
+              child: Screenshot(
+                controller: _screenshotController,
+                child: Column(
+                  children: _messages
+                      .map((message) => ChatBubble(
+                            message: message,
+                            leftBubbleColor: _leftBubbleColor,
+                            rightBubbleColor: _rightBubbleColor,
+                            leftTextColor: _leftTextColor,
+                            rightTextColor: _rightTextColor,
+                            bubbleRadius: _bubbleRadius,
+                            fontSize: _fontSize,
+                            senderFontSize: _senderFontSize,
+                          ))
+                      .toList(),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // 添加保存截图的方法
+  Future<void> _saveScreenshot() async {
+    try {
+      // 获取设备像素比
+      final double pixelRatio = MediaQuery.of(context).devicePixelRatio;
+
+      // 捕获截图
+      final Uint8List? imageBytes = await _screenshotController.capture(
+        delay: const Duration(milliseconds: 100),
+        pixelRatio: pixelRatio,
+      );
+
+      if (imageBytes != null) {
+        // 获取下载目录
+        final downloadDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+
+        // 生成文件名
+        final String timestamp =
+            DateTime.now().millisecondsSinceEpoch.toString();
+        final String fileName = 'chat_screenshot_$timestamp.png';
+        final String filePath = '${downloadDir.path}/$fileName';
+
+        // 保存文件
+        final File imageFile = File(filePath);
+        await imageFile.writeAsBytes(imageBytes);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 5),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('截图保存成功！'),
+                  const SizedBox(height: 4),
+                  Text(
+                    '保存在手机的Download文件夹中',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 2),
+                  Text('文件名: $fileName', style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('截图保存失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('截图保存失败: $e')),
+        );
+      }
+    }
   }
 }
 
