@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:ui' as ui;
 import 'dart:math';
+import 'package:flutter/services.dart';
 
 void main() {
   runApp(const MyApp());
@@ -44,16 +45,66 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // 示例数据
   final List<ChatMessage> _messages = [
-    ChatMessage(sender: "用户A", message: "你好！", isLeft: true),
-    ChatMessage(sender: "用户B", message: "你好！很高兴见到你。", isLeft: false),
-    ChatMessage(sender: "用户A", message: "今天天气真不错。", isLeft: true),
-    ChatMessage(sender: "用户B", message: "是的，阳光明媚，很适合出去走走。", isLeft: false),
-    ChatMessage(sender: "用户A", message: "你末有什么计划吗？", isLeft: true),
-    ChatMessage(sender: "用户B", message: "我打算去公园野餐，你要一起来吗？", isLeft: false),
-    ChatMessage(sender: "用户A", message: "听起来不错！需要我带些什么吗？", isLeft: true),
-    ChatMessage(sender: "用户B", message: "你可以带些水果或饮料，我来准备主食。", isLeft: false),
-    ChatMessage(sender: "用户A", message: "好的，我带些苹果和橙汁。几点见面？", isLeft: true),
-    ChatMessage(sender: "用户B", message: "上午10点如何？这个时间阳光正好。", isLeft: false),
+    ChatMessage(
+      sender: "用户A",
+      message: "你好！",
+      isLeft: true,
+      avatar: 'assets/avatar_a.png',
+    ),
+    ChatMessage(
+      sender: "用户B",
+      message: "你好！很高兴见到你。",
+      isLeft: false,
+      avatar: 'assets/avatar_b.png',
+    ),
+    ChatMessage(
+      sender: "用户A",
+      message: "今天天气真不错。",
+      isLeft: true,
+      avatar: 'assets/avatar_a.png',
+    ),
+    ChatMessage(
+      sender: "用户B",
+      message: "是的，阳光明媚，很适合出去走走。",
+      isLeft: false,
+      avatar: 'assets/avatar_b.png',
+    ),
+    ChatMessage(
+      sender: "用户A",
+      message: "你末有什么计划吗？",
+      isLeft: true,
+      avatar: 'assets/avatar_a.png',
+    ),
+    ChatMessage(
+      sender: "用户B",
+      message: "我打算去公园野餐，你要一起来吗？",
+      isLeft: false,
+      avatar: 'assets/avatar_b.png',
+    ),
+    ChatMessage(
+      sender: "用户A",
+      message: "听起来不错！需要我带些什么吗？",
+      isLeft: true,
+      avatar: 'assets/avatar_a.png',
+    ),
+    ChatMessage(
+      sender: "用户B",
+      message: "你可以带些水果或饮料，我来准备主食。",
+      isLeft: false,
+      avatar: 'assets/avatar_b.png',
+    ),
+    ChatMessage(
+      sender: "用户A",
+      message: "好的，我带些苹果和橙汁。几点见面？",
+      isLeft: true,
+      avatar: 'assets/avatar_a.png',
+    ),
+    ChatMessage(
+      sender: "用户B",
+      message: "上午10点如何？这个时间阳光正好。",
+      isLeft: false,
+      avatar: 'assets/avatar_b.png',
+    ),
   ];
 
   // 添加进度变量
@@ -67,8 +118,8 @@ class _ChatScreenState extends State<ChatScreen> {
   double _senderFontSize = 24.0;
 
   // 添加界面控制相关的状态变量
-  Color _leftBubbleColor = Colors.grey[300]!;
-  Color _rightBubbleColor = Colors.blue[100]!;
+  Color _leftBubbleColor = Colors.white;
+  Color _rightBubbleColor = const Color(0xFF95EC69);
   Color _leftTextColor = Colors.black;
   Color _rightTextColor = Colors.black;
   double _bubbleRadius = 20.0;
@@ -104,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 添加一个方法来确保值在范围内
+  // 添加一个方法来确保值在围内
   double _clampFontSize(double value) {
     return value.clamp(20.0, 48.0);
   }
@@ -279,7 +330,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _progressText = '准备生成...';
       });
 
-      // 1. 创建临时目��存放帧图片
+      // 1. 创建临时目录存放帧图片
       final tempDir = await getTemporaryDirectory();
       final framesDir = Directory('${tempDir.path}/frames');
       if (await framesDir.exists()) {
@@ -302,8 +353,7 @@ class _ChatScreenState extends State<ChatScreen> {
             text: message.sender,
             style: TextStyle(
               fontSize: _senderFontSize,
-              fontWeight: FontWeight.bold,
-              color: message.isLeft ? _leftTextColor : _rightTextColor,
+              color: Colors.grey[600], // 用户名使用灰色
             ),
           ),
           textDirection: TextDirection.ltr,
@@ -334,7 +384,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ));
       }
 
-      // 根据内容计算所需的��准帧数
+      // 根据内容计算所需的标准帧数
       final int baseFrames = _calculateBaseFrames(totalHeight, frameSize);
       final int totalFrames = (baseFrames / _animationSpeed).round();
 
@@ -365,26 +415,57 @@ class _ChatScreenState extends State<ChatScreen> {
         double y = currentY;
         for (final layout in messageLayouts) {
           if (y + layout.height > 0 && y < frameSize) {
-            final x = layout.message.isLeft
-                ? 40.0
+            // 计算基础x坐标，考虑头像空间
+            final baseX = layout.message.isLeft
+                ? 80.0 // 40(边距) + 40(头像空间)
                 : frameSize -
                     max(layout.senderTextPainter.width,
                         layout.messageTextPainter.width) -
-                    40;
+                    80;
+
+            // 绘制头像
+            final avatarImage = await loadImage(layout.message.avatar);
+            final avatarRect = Rect.fromCircle(
+              center: Offset(
+                layout.message.isLeft ? 40 : frameSize - 40,
+                y + layout.senderTextPainter.height + 30,
+              ),
+              radius: 20,
+            );
+
+            // 绘制圆形头像
+            final avatarPath = Path()..addOval(avatarRect);
+            canvas.save();
+            canvas.clipPath(avatarPath);
+            canvas.drawImageRect(
+              avatarImage,
+              Rect.fromLTWH(0, 0, avatarImage.width.toDouble(),
+                  avatarImage.height.toDouble()),
+              avatarRect,
+              Paint(),
+            );
+            canvas.restore();
+
+            // 绘制用户名
+            layout.senderTextPainter.paint(canvas, Offset(baseX, y));
 
             // 绘制气泡
-            final bubblePath = Path()
-              ..addRRect(RRect.fromRectAndRadius(
-                Rect.fromLTWH(
-                  x - 16,
-                  y,
-                  max(layout.senderTextPainter.width,
-                          layout.messageTextPainter.width) +
-                      32,
-                  layout.height,
-                ),
-                Radius.circular(_bubbleRadius),
-              ));
+            final bubblePath = Path();
+            final bubbleRect = RRect.fromRectAndCorners(
+              Rect.fromLTWH(
+                baseX - 16,
+                y + layout.senderTextPainter.height + 4,
+                layout.messageTextPainter.width + 32,
+                layout.messageTextPainter.height + 20,
+              ),
+              topLeft:
+                  Radius.circular(layout.message.isLeft ? 0 : _bubbleRadius),
+              topRight:
+                  Radius.circular(layout.message.isLeft ? _bubbleRadius : 0),
+              bottomLeft: Radius.circular(_bubbleRadius),
+              bottomRight: Radius.circular(_bubbleRadius),
+            );
+            bubblePath.addRRect(bubbleRect);
 
             canvas.drawPath(
               bubblePath,
@@ -394,14 +475,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 ..style = PaintingStyle.fill,
             );
 
-            // 绘制发送者名字
-            layout.senderTextPainter.paint(canvas, Offset(x, y + 10));
-
-            // 绘制消息内容
-            layout.messageTextPainter.paint(
-              canvas,
-              Offset(x, y + 10 + layout.senderTextPainter.height + 4),
-            );
+            // 绘制消息文本
+            layout.messageTextPainter.paint(canvas,
+                Offset(baseX, y + layout.senderTextPainter.height + 14));
           }
           y += layout.height + 20;
         }
@@ -457,7 +533,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final session = await FFmpegKit.execute(command);
       final returnCode = await session.getReturnCode();
 
-      // 获取完整的出和日志
+      // 获取完整的输出和日志
       final output = await session.getOutput();
       final logs = await session.getLogs();
       print('FFmpeg complete output:');
@@ -542,6 +618,15 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // 添加图片加载辅助方法
+  Future<ui.Image> loadImage(String assetPath) async {
+    final ByteData data = await rootBundle.load(assetPath);
+    final Uint8List bytes = data.buffer.asUint8List();
+    final ui.Codec codec = await ui.instantiateImageCodec(bytes);
+    final ui.FrameInfo fi = await codec.getNextFrame();
+    return fi.image;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -567,7 +652,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Column(
                           children: [
                             ListTile(
-                              title: const Text('左侧气泡颜色'),
+                              title: const Text('左气泡颜色'),
                               trailing: Container(
                                 width: 24,
                                 height: 24,
@@ -802,11 +887,13 @@ class ChatMessage {
   final String sender;
   final String message;
   final bool isLeft;
+  final String avatar; // 新增头像字段
 
   ChatMessage({
     required this.sender,
     required this.message,
     required this.isLeft,
+    this.avatar = 'assets/default_avatar.png', // 默认头像
   });
 }
 
@@ -836,43 +923,87 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment:
-            message.isLeft ? MainAxisAlignment.start : MainAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment:
+            message.isLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
         children: [
-          if (!message.isLeft) const Spacer(),
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.7,
+          // 发送者名字
+          Padding(
+            padding: EdgeInsets.only(
+              left: message.isLeft ? 48 : 0, // 为头像留出空间
+              right: message.isLeft ? 0 : 48,
+              bottom: 4,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: message.isLeft ? leftBubbleColor : rightBubbleColor,
-              borderRadius: BorderRadius.circular(bubbleRadius),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.sender,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: senderFontSize,
-                    color: message.isLeft ? leftTextColor : rightTextColor,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message.message,
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    color: message.isLeft ? leftTextColor : rightTextColor,
-                  ),
-                ),
-              ],
+            child: Text(
+              message.sender,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: senderFontSize,
+                color: message.isLeft
+                    ? leftTextColor
+                    : rightTextColor, // 确保使用正确的颜色
+              ),
             ),
           ),
-          if (message.isLeft) const Spacer(),
+          // 消息行
+          Row(
+            mainAxisAlignment: message.isLeft
+                ? MainAxisAlignment.start
+                : MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start, // 确保头像与气泡顶部对齐
+            children: [
+              if (!message.isLeft) const Spacer(),
+              if (message.isLeft)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundImage: AssetImage(message.avatar),
+                  ),
+                ),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth:
+                      MediaQuery.of(context).size.width * 0.65, // 稍微减小以适应头像
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: message.isLeft ? leftBubbleColor : rightBubbleColor,
+                    borderRadius: BorderRadius.only(
+                      topLeft:
+                          Radius.circular(message.isLeft ? 0 : bubbleRadius),
+                      topRight:
+                          Radius.circular(message.isLeft ? bubbleRadius : 0),
+                      bottomLeft: Radius.circular(bubbleRadius),
+                      bottomRight: Radius.circular(bubbleRadius),
+                    ),
+                  ),
+                  child: Text(
+                    message.message,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      color: message.isLeft
+                          ? leftTextColor
+                          : rightTextColor, // 确保使用正确的颜色
+                    ),
+                  ),
+                ),
+              ),
+              if (message.isLeft) const Spacer(),
+              if (!message.isLeft)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundImage: AssetImage(message.avatar),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
