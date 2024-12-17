@@ -198,53 +198,95 @@ class _ChatScreenState extends State<ChatScreen> {
       await framesDir.create();
 
       // 2. 生成每一帧的图片
-      final frameWidth = MediaQuery.of(context).size.width;
-      final frameHeight = MediaQuery.of(context).size.height;
+      // 使用1:1的正方形尺寸
+      final frameSize = 1080.0; // 1080x1080 是社交媒体常用的尺寸
 
-      for (int i = 0; i < _messages.length; i++) {
-        // 为每一帧创建新的 recorder 和 canvas
-        final recorder = ui.PictureRecorder();
-        final canvas = Canvas(recorder);
+      // 计算所有消息的总高度
+      double totalHeight = 0;
+      final List<_MessageLayout> messageLayouts = [];
 
-        // 清空画布
-        canvas.drawColor(Colors.white, BlendMode.src);
-
-        // 绘制消息
-        final message = _messages[i];
+      // 先计算所有消息的布局
+      for (final message in _messages) {
         final textPainter = TextPainter(
           text: TextSpan(
             text: '${message.sender}: ${message.message}',
-            style: const TextStyle(fontSize: 16),
+            style: const TextStyle(fontSize: 32), // 增大字体以适应视频尺寸
           ),
           textDirection: TextDirection.ltr,
         );
-        textPainter.layout(maxWidth: frameWidth * 0.8);
+        textPainter.layout(maxWidth: frameSize * 0.8);
 
-        final x = message.isLeft ? 20.0 : frameWidth - textPainter.width - 20;
-        final y = frameHeight - (i + 1) * 60.0;
+        final messageHeight = textPainter.height + 40; // 添加内边距
+        totalHeight += messageHeight + 20; // 添加消息间距
 
-        // 绘制气泡背景
-        final paint = Paint()
-          ..color = message.isLeft ? Colors.grey[300]! : Colors.blue[100]!;
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(x - 10, y - 10, textPainter.width + 20,
-                textPainter.height + 20),
-            const Radius.circular(20),
-          ),
-          paint,
+        messageLayouts.add(_MessageLayout(
+          message: message,
+          textPainter: textPainter,
+          height: messageHeight,
+        ));
+      }
+
+      // 生成60帧的动画
+      final int totalFrames = 60;
+      for (int frame = 0; frame < totalFrames; frame++) {
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder);
+
+        // 绘制白色背景
+        canvas.drawRect(
+          Rect.fromLTWH(0, 0, frameSize, frameSize),
+          Paint()..color = Colors.white,
         );
 
-        textPainter.paint(canvas, Offset(x, y));
+        // 计算当前帧的垂直偏移
+        final progress = frame / (totalFrames - 1);
+        final currentY = frameSize - (totalHeight + frameSize * 0.1) * progress;
+
+        // 绘制所有消息
+        double y = currentY;
+        for (final layout in messageLayouts) {
+          if (y + layout.height > 0 && y < frameSize) {
+            // 只绘制可见区域内的消息
+            final x = layout.message.isLeft
+                ? 40.0
+                : frameSize - layout.textPainter.width - 40;
+
+            // 绘制气泡背景
+            final bubblePath = Path()
+              ..addRRect(RRect.fromRectAndRadius(
+                Rect.fromLTWH(
+                  x - 20,
+                  y,
+                  layout.textPainter.width + 40,
+                  layout.height,
+                ),
+                const Radius.circular(20),
+              ));
+
+            canvas.drawPath(
+              bubblePath,
+              Paint()
+                ..color = layout.message.isLeft
+                    ? Colors.grey[300]!
+                    : Colors.blue[100]!
+                ..style = PaintingStyle.fill,
+            );
+
+            // 绘制文本
+            layout.textPainter.paint(canvas, Offset(x, y + 20));
+          }
+          y += layout.height + 20;
+        }
 
         // 保存帧
         final picture = recorder.endRecording();
         final image =
-            await picture.toImage(frameWidth.toInt(), frameHeight.toInt());
+            await picture.toImage(frameSize.toInt(), frameSize.toInt());
         final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
         final buffer = byteData!.buffer.asUint8List();
 
-        final frameFile = File('${framesDir.path}/frame_$i.png');
+        final frameFile = File(
+            '${framesDir.path}/frame_${frame.toString().padLeft(4, '0')}.png');
         await frameFile.writeAsBytes(buffer);
       }
 
@@ -258,27 +300,12 @@ class _ChatScreenState extends State<ChatScreen> {
         await outputDir.create(recursive: true);
       }
 
-      // 检查源文件是否存在
-      final firstFrame = File('${framesDir.path}/frame_0.png');
-      if (!await firstFrame.exists()) {
-        throw Exception('Source frames not found');
-      }
-      print('First frame exists: ${await firstFrame.exists()}');
-      print('First frame size: ${await firstFrame.length()} bytes');
-
-      // 列出所有帧文件
-      final List<FileSystemEntity> frameFiles = await framesDir.list().toList();
-      print('Total frames: ${frameFiles.length}');
-      for (var file in frameFiles) {
-        print('Frame file: ${file.path}');
-      }
-
-      // 使用更简单的FFmpeg命令，使用 mpeg4 编码器
+      // 使用更高的帧率生成视频
       final command = '''
         -y \
         -f image2 \
-        -framerate 1 \
-        -i ${framesDir.path}/frame_%d.png \
+        -framerate 30 \
+        -i ${framesDir.path}/frame_%04d.png \
         -c:v mpeg4 \
         -q:v 1 \
         -pix_fmt yuv420p \
@@ -450,4 +477,16 @@ class ChatBubble extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MessageLayout {
+  final ChatMessage message;
+  final TextPainter textPainter;
+  final double height;
+
+  _MessageLayout({
+    required this.message,
+    required this.textPainter,
+    required this.height,
+  });
 }
