@@ -115,7 +115,7 @@ class _ChatScreenState extends State<ChatScreen> {
   double _animationSpeed = 1.0; // 默认速度为1.0
 
   // 添加用户名字体大小控制
-  double _senderFontSize = 24.0;
+  double _senderFontSize = 16.0;
 
   // 添加界面控制相关的状态变量
   Color _leftBubbleColor = Colors.white;
@@ -161,7 +161,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   double _clampSenderFontSize(double value) {
-    return value.clamp(16.0, 36.0);
+    return value.clamp(12.0, 24.0);
   }
 
   @override
@@ -428,7 +428,7 @@ class _ChatScreenState extends State<ChatScreen> {
             final avatarRect = Rect.fromCircle(
               center: Offset(
                 layout.message.isLeft ? 40 : frameSize - 40,
-                y + layout.senderTextPainter.height + 30,
+                y + 20,
               ),
               radius: 20,
             );
@@ -481,7 +481,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ..style = PaintingStyle.fill,
             );
 
-            // 绘制消息文本
+            // 绘制��息文本
             layout.messageTextPainter.paint(canvas,
                 Offset(baseX, y + layout.senderTextPainter.height + 14));
           }
@@ -790,9 +790,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                   Slider(
                                     value: _senderFontSize,
-                                    min: 16.0,
-                                    max: 36.0,
-                                    divisions: 20,
+                                    min: 12.0,
+                                    max: 24.0,
+                                    divisions: 12,
                                     label: _senderFontSize.toStringAsFixed(1),
                                     onChanged: (value) {
                                       setState(() => _senderFontSize =
@@ -929,87 +929,74 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment:
-            message.isLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      child: Row(
+        mainAxisAlignment:
+            message.isLeft ? MainAxisAlignment.start : MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start, // 确保顶部对齐
         children: [
-          // 发送者名字
+          if (!message.isLeft) const Spacer(),
+          if (message.isLeft)
+            CircleAvatar(
+              radius: 20,
+              backgroundImage: AssetImage(message.avatar),
+            ),
           Padding(
             padding: EdgeInsets.only(
-              left: message.isLeft ? 48 : 0, // 为头像留出空间
-              right: message.isLeft ? 0 : 48,
-              bottom: 4,
+              left: message.isLeft ? 8.0 : 0,
+              right: message.isLeft ? 0 : 8.0,
             ),
-            child: Text(
-              message.sender,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: senderFontSize,
-                color: message.isLeft
-                    ? leftTextColor
-                    : rightTextColor, // 确保使用正确的颜色
-              ),
-            ),
-          ),
-          // 消���行
-          Row(
-            mainAxisAlignment: message.isLeft
-                ? MainAxisAlignment.start
-                : MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.start, // 确保头像与气泡顶部对齐
-            children: [
-              if (!message.isLeft) const Spacer(),
-              if (message.isLeft)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundImage: AssetImage(message.avatar),
+            child: Column(
+              crossAxisAlignment: message.isLeft
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.end,
+              children: [
+                Text(
+                  message.sender,
+                  style: TextStyle(
+                    fontSize: senderFontSize,
+                    color: Colors.grey[600],
                   ),
                 ),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth:
-                      MediaQuery.of(context).size.width * 0.65, // 稍微减小以适应头像
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                const SizedBox(height: 4),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.65,
                   ),
-                  decoration: BoxDecoration(
-                    color: message.isLeft ? leftBubbleColor : rightBubbleColor,
-                    borderRadius: BorderRadius.only(
-                      topLeft:
-                          Radius.circular(message.isLeft ? 0 : bubbleRadius),
-                      topRight:
-                          Radius.circular(message.isLeft ? bubbleRadius : 0),
-                      bottomLeft: Radius.circular(bubbleRadius),
-                      bottomRight: Radius.circular(bubbleRadius),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
                     ),
-                  ),
-                  child: Text(
-                    message.message,
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      color: message.isLeft
-                          ? leftTextColor
-                          : rightTextColor, // 确保使用正确的颜色
+                    decoration: BoxDecoration(
+                      color:
+                          message.isLeft ? leftBubbleColor : rightBubbleColor,
+                      borderRadius: BorderRadius.only(
+                        topLeft:
+                            Radius.circular(message.isLeft ? 0 : bubbleRadius),
+                        topRight:
+                            Radius.circular(message.isLeft ? bubbleRadius : 0),
+                        bottomLeft: Radius.circular(bubbleRadius),
+                        bottomRight: Radius.circular(bubbleRadius),
+                      ),
+                    ),
+                    child: Text(
+                      message.message,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        color: message.isLeft ? leftTextColor : rightTextColor,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (message.isLeft) const Spacer(),
-              if (!message.isLeft)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundImage: AssetImage(message.avatar),
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
+          if (message.isLeft) const Spacer(),
+          if (!message.isLeft)
+            CircleAvatar(
+              radius: 20,
+              backgroundImage: AssetImage(message.avatar),
+            ),
         ],
       ),
     );
