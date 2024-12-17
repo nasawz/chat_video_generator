@@ -45,12 +45,21 @@ class _ChatScreenState extends State<ChatScreen> {
     ChatMessage(sender: "用户A", message: "你好！", isLeft: true),
     ChatMessage(sender: "用户B", message: "你好！很高兴见到你。", isLeft: false),
     ChatMessage(sender: "用户A", message: "今天天气真不错。", isLeft: true),
-    ChatMessage(sender: "用户B", message: "是的，阳光明媚。", isLeft: false),
+    ChatMessage(sender: "用户B", message: "是的，阳光明媚，很适合出去走走。", isLeft: false),
+    ChatMessage(sender: "用户A", message: "你周末有什么计划吗？", isLeft: true),
+    ChatMessage(sender: "用户B", message: "我打算去公园野餐，你要一起来吗？", isLeft: false),
+    ChatMessage(sender: "用户A", message: "听起来不错！需要我带些什么吗？", isLeft: true),
+    ChatMessage(sender: "用户B", message: "你可以带些水果或饮料，我来准备主食。", isLeft: false),
+    ChatMessage(sender: "用户A", message: "好的，我带些苹果和橙汁。几点见面？", isLeft: true),
+    ChatMessage(sender: "用户B", message: "上午10点如何？这个时间阳光正好。", isLeft: false),
   ];
 
   // 添加进度变量
   double _generationProgress = 0.0;
   String _progressText = '';
+
+  // 添加速度控制变量
+  double _animationSpeed = 1.0; // 默认速度为1.0
 
   @override
   void initState() {
@@ -92,7 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final androidInfo = await DeviceInfoPlugin().androidInfo;
       final androidVersion = androidInfo.version.sdkInt;
 
-      // 请求所有必要的权限
+      // 请求所有必要权限
       final permissions = <Permission>[
         Permission.microphone,
         Permission.notification,
@@ -187,6 +196,24 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // 计算基准帧数
+  int _calculateBaseFrames(double totalHeight, double frameSize) {
+    // 计算需要滚动的实际距离
+    double scrollDistance = totalHeight + frameSize * 0.1;
+
+    // 假设每秒滚动 200 像素是适合阅读的速度
+    double pixelsPerSecond = 200.0;
+
+    // 计算需要的总秒数
+    double totalSeconds = scrollDistance / pixelsPerSecond;
+
+    // 转换为帧数（30fps）
+    int baseFrames = (totalSeconds * 30).round();
+
+    // 设置最小帧数，确保即使内容很少也有基本的动画效果
+    return baseFrames.clamp(60, 900); // 最少2秒，最多30秒
+  }
+
   Future<void> _generateVideo() async {
     if (_isGenerating) return;
 
@@ -224,7 +251,7 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         textPainter.layout(maxWidth: frameSize * 0.8);
 
-        final messageHeight = textPainter.height + 40; // 添加内边距
+        final messageHeight = textPainter.height + 40; // 添加边距
         totalHeight += messageHeight + 20; // 添加消息间距
 
         messageLayouts.add(_MessageLayout(
@@ -234,8 +261,19 @@ class _ChatScreenState extends State<ChatScreen> {
         ));
       }
 
-      // 生成60帧的动画
-      final int totalFrames = 60;
+      // 根据内容计算所需的基准帧数
+      final int baseFrames = _calculateBaseFrames(totalHeight, frameSize);
+      final int totalFrames = (baseFrames / _animationSpeed).round();
+
+      print('Total height: $totalHeight px');
+      print('Base frames: $baseFrames');
+      print('Actual frames with speed ${_animationSpeed}x: $totalFrames');
+
+      // 计算帧率 (在FFmpeg命令之前)
+      final frameRate =
+          (totalFrames / (totalHeight / (200.0 * _animationSpeed))).round();
+
+      // 生成帧
       for (int frame = 0; frame < totalFrames; frame++) {
         final recorder = ui.PictureRecorder();
         final canvas = Canvas(recorder);
@@ -246,7 +284,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Paint()..color = Colors.white,
         );
 
-        // 计算当前帧的垂直偏移
+        // 移除速度变量，因为已经通过帧数调整了
         final progress = frame / (totalFrames - 1);
         final currentY = frameSize - (totalHeight + frameSize * 0.1) * progress;
 
@@ -312,18 +350,18 @@ class _ChatScreenState extends State<ChatScreen> {
       // 3. 使用FFmpeg将图片序列转换为视频
       _currentVideoPath = await _getVideoSavePath();
 
-      // 确保输出目录存在
+      // 确保输出目���存在
       final outputDir = Directory(
           _currentVideoPath!.substring(0, _currentVideoPath!.lastIndexOf('/')));
       if (!await outputDir.exists()) {
         await outputDir.create(recursive: true);
       }
 
-      // 使用更高的帧率生成视频
+      // 更新FFmpeg命令，确保使用正确的帧率
       final command = '''
         -y \
         -f image2 \
-        -framerate 30 \
+        -framerate $frameRate \
         -i ${framesDir.path}/frame_%04d.png \
         -c:v mpeg4 \
         -q:v 1 \
@@ -355,7 +393,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
         print('Video generation completed successfully');
 
-        // 检查生成的视频文件
+        // 检查生���的视频文件
         final videoFile = File(_currentVideoPath!);
         final videoExists = await videoFile.exists();
         final videoSize = await videoFile.length();
@@ -454,15 +492,49 @@ class _ChatScreenState extends State<ChatScreen> {
               )
             : null,
       ),
-      body: ListView.builder(
-        key: _chatKey,
-        controller: _scrollController,
-        reverse: true,
-        itemCount: _messages.length,
-        itemBuilder: (context, index) {
-          final message = _messages[index];
-          return ChatBubble(message: message);
-        },
+      body: Column(
+        children: [
+          // 添加速度控制滑块
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('滚动速度'),
+                    Text('${_animationSpeed.toStringAsFixed(1)}x'),
+                  ],
+                ),
+                Slider(
+                  value: _animationSpeed,
+                  min: 0.5,
+                  max: 2.0,
+                  divisions: 15,
+                  label: '${_animationSpeed.toStringAsFixed(1)}x',
+                  onChanged: (value) {
+                    setState(() {
+                      _animationSpeed = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          // 聊天列表现在需要放在Expanded中
+          Expanded(
+            child: ListView.builder(
+              key: _chatKey,
+              controller: _scrollController,
+              reverse: true,
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final message = _messages[index];
+                return ChatBubble(message: message);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
