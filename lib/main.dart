@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:ui' as ui;
+import 'dart:math';
 
 void main() {
   runApp(const MyApp());
@@ -47,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ChatMessage(sender: "用户B", message: "你好！很高兴见到你。", isLeft: false),
     ChatMessage(sender: "用户A", message: "今天天气真不错。", isLeft: true),
     ChatMessage(sender: "用户B", message: "是的，阳光明媚，很适合出去走走。", isLeft: false),
-    ChatMessage(sender: "用户A", message: "你周末有什么计划吗？", isLeft: true),
+    ChatMessage(sender: "用户A", message: "你末有什么计划吗？", isLeft: true),
     ChatMessage(sender: "用户B", message: "我打算去公园野餐，你要一起来吗？", isLeft: false),
     ChatMessage(sender: "用户A", message: "听起来不错！需要我带些什么吗？", isLeft: true),
     ChatMessage(sender: "用户B", message: "你可以带些水果或饮料，我来准备主食。", isLeft: false),
@@ -62,7 +63,10 @@ class _ChatScreenState extends State<ChatScreen> {
   // 添加速度控制变量
   double _animationSpeed = 1.0; // 默认速度为1.0
 
-  // ���加界面控制相关的状态变量
+  // 添加用户名字体大小控制
+  double _senderFontSize = 24.0;
+
+  // 添加界面控制相关的状态变量
   Color _leftBubbleColor = Colors.grey[300]!;
   Color _rightBubbleColor = Colors.blue[100]!;
   Color _leftTextColor = Colors.black;
@@ -105,11 +109,16 @@ class _ChatScreenState extends State<ChatScreen> {
     return value.clamp(20.0, 48.0);
   }
 
+  double _clampSenderFontSize(double value) {
+    return value.clamp(16.0, 36.0);
+  }
+
   @override
   void initState() {
     super.initState();
     // 确保初始值在有效范围内
     _fontSize = _clampFontSize(_fontSize);
+    _senderFontSize = _clampSenderFontSize(_senderFontSize);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
@@ -270,7 +279,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _progressText = '准备生成...';
       });
 
-      // 1. 创建临时目录存放帧图片
+      // 1. 创建临时目��存放帧图片
       final tempDir = await getTemporaryDirectory();
       final framesDir = Directory('${tempDir.path}/frames');
       if (await framesDir.exists()) {
@@ -286,28 +295,46 @@ class _ChatScreenState extends State<ChatScreen> {
       double totalHeight = 0;
       final List<_MessageLayout> messageLayouts = [];
 
-      // 先计算所有消息的布局
+      // 计算所有消息的布局
       for (final message in _messages) {
-        final textPainter = TextPainter(
+        final senderTextPainter = TextPainter(
           text: TextSpan(
-            text: '${message.sender}: ${message.message}',
-            style: const TextStyle(fontSize: 32), // 增大字体以适应视频尺寸
+            text: message.sender,
+            style: TextStyle(
+              fontSize: _senderFontSize,
+              fontWeight: FontWeight.bold,
+              color: message.isLeft ? _leftTextColor : _rightTextColor,
+            ),
           ),
           textDirection: TextDirection.ltr,
         );
-        textPainter.layout(maxWidth: frameSize * 0.8);
+        senderTextPainter.layout(maxWidth: frameSize * 0.8);
 
-        final messageHeight = textPainter.height + 40; // 添加边距
-        totalHeight += messageHeight + 20; // 添加消息间距
+        final messageTextPainter = TextPainter(
+          text: TextSpan(
+            text: message.message,
+            style: TextStyle(
+              fontSize: _fontSize,
+              color: message.isLeft ? _leftTextColor : _rightTextColor,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        messageTextPainter.layout(maxWidth: frameSize * 0.8);
+
+        final messageHeight =
+            senderTextPainter.height + 4 + messageTextPainter.height + 20;
+        totalHeight += messageHeight + 20;
 
         messageLayouts.add(_MessageLayout(
           message: message,
-          textPainter: textPainter,
+          senderTextPainter: senderTextPainter,
+          messageTextPainter: messageTextPainter,
           height: messageHeight,
         ));
       }
 
-      // 根据内容计算所需的基准帧数
+      // 根据内容计算所需的��准帧数
       final int baseFrames = _calculateBaseFrames(totalHeight, frameSize);
       final int totalFrames = (baseFrames / _animationSpeed).round();
 
@@ -330,7 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Paint()..color = Colors.white,
         );
 
-        // 移除速度变量，因为已经通过帧数调整了
+        // 计算当前帧的垂直偏移
         final progress = frame / (totalFrames - 1);
         final currentY = frameSize - (totalHeight + frameSize * 0.1) * progress;
 
@@ -340,15 +367,20 @@ class _ChatScreenState extends State<ChatScreen> {
           if (y + layout.height > 0 && y < frameSize) {
             final x = layout.message.isLeft
                 ? 40.0
-                : frameSize - layout.textPainter.width - 40;
+                : frameSize -
+                    max(layout.senderTextPainter.width,
+                        layout.messageTextPainter.width) -
+                    40;
 
-            // 使用自定义颜色绘制气泡
+            // 绘制气泡
             final bubblePath = Path()
               ..addRRect(RRect.fromRectAndRadius(
                 Rect.fromLTWH(
-                  x - 20,
+                  x - 16,
                   y,
-                  layout.textPainter.width + 40,
+                  max(layout.senderTextPainter.width,
+                          layout.messageTextPainter.width) +
+                      32,
                   layout.height,
                 ),
                 Radius.circular(_bubbleRadius),
@@ -362,20 +394,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 ..style = PaintingStyle.fill,
             );
 
-            // 使用自定义颜色和字体大小绘制文字
-            final textPainter = TextPainter(
-              text: TextSpan(
-                text: '${layout.message.sender}: ${layout.message.message}',
-                style: TextStyle(
-                  fontSize: _fontSize,
-                  color:
-                      layout.message.isLeft ? _leftTextColor : _rightTextColor,
-                ),
-              ),
-              textDirection: TextDirection.ltr,
+            // 绘制发送者名字
+            layout.senderTextPainter.paint(canvas, Offset(x, y + 10));
+
+            // 绘制消息内容
+            layout.messageTextPainter.paint(
+              canvas,
+              Offset(x, y + 10 + layout.senderTextPainter.height + 4),
             );
-            textPainter.layout(maxWidth: frameSize * 0.8);
-            textPainter.paint(canvas, Offset(x, y + 20));
           }
           y += layout.height + 20;
         }
@@ -431,7 +457,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final session = await FFmpegKit.execute(command);
       final returnCode = await session.getReturnCode();
 
-      // 获取完整的���出和日志
+      // 获取完整的出和日志
       final output = await session.getOutput();
       final logs = await session.getLogs();
       print('FFmpeg complete output:');
@@ -658,6 +684,34 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ],
                               ),
                             ),
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('用户名字体大小'),
+                                      Text(
+                                          '${_senderFontSize.toStringAsFixed(1)}'),
+                                    ],
+                                  ),
+                                  Slider(
+                                    value: _senderFontSize,
+                                    min: 16.0,
+                                    max: 36.0,
+                                    divisions: 20,
+                                    label: _senderFontSize.toStringAsFixed(1),
+                                    onChanged: (value) {
+                                      setState(() => _senderFontSize =
+                                          _clampSenderFontSize(value));
+                                      setModalState(() {});
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       );
@@ -733,6 +787,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   rightTextColor: _rightTextColor,
                   bubbleRadius: _bubbleRadius,
                   fontSize: _fontSize,
+                  senderFontSize: _senderFontSize,
                 );
               },
             ),
@@ -763,6 +818,7 @@ class ChatBubble extends StatelessWidget {
   final Color rightTextColor;
   final double bubbleRadius;
   final double fontSize;
+  final double senderFontSize;
 
   const ChatBubble({
     super.key,
@@ -773,6 +829,7 @@ class ChatBubble extends StatelessWidget {
     required this.rightTextColor,
     required this.bubbleRadius,
     required this.fontSize,
+    required this.senderFontSize,
   });
 
   @override
@@ -800,7 +857,7 @@ class ChatBubble extends StatelessWidget {
                   message.sender,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: fontSize * 0.375, // 保持发送者名字较小
+                    fontSize: senderFontSize,
                     color: message.isLeft ? leftTextColor : rightTextColor,
                   ),
                 ),
@@ -824,12 +881,14 @@ class ChatBubble extends StatelessWidget {
 
 class _MessageLayout {
   final ChatMessage message;
-  final TextPainter textPainter;
+  final TextPainter senderTextPainter;
+  final TextPainter messageTextPainter;
   final double height;
 
   _MessageLayout({
     required this.message,
-    required this.textPainter,
+    required this.senderTextPainter,
+    required this.messageTextPainter,
     required this.height,
   });
 }
