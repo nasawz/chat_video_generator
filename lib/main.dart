@@ -4,13 +4,11 @@ import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:ui' as ui;
 import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:screenshot/screenshot.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() {
   runApp(const MyApp());
@@ -48,62 +46,62 @@ class _ChatScreenState extends State<ChatScreen> {
   // 示例数据
   final List<ChatMessage> _messages = [
     ChatMessage(
-      sender: "用户A",
-      message: "你好！",
+      sender: "忘忧",
+      message: "今天真是个美好的冬日，你听这首歌了吗？",
       isLeft: true,
       avatar: 'assets/avatar_a.png',
     ),
     ChatMessage(
-      sender: "用户B",
-      message: "你好！很高兴见到你。",
+      sender: "小萱",
+      message: "是的，我听了，这首歌真的很美，让人感觉像是在冬天的仙境中漫步。",
       isLeft: false,
       avatar: 'assets/avatar_b.png',
     ),
     ChatMessage(
-      sender: "用户A",
-      message: "今天天气真不错。",
+      sender: "忘忧",
+      message: "对啊，歌词中描述的冬夜森林，冰晶闪烁，雾气缭绕，真像是一个魔法的世界。",
       isLeft: true,
       avatar: 'assets/avatar_a.png',
     ),
     ChatMessage(
-      sender: "用户B",
-      message: "是的，阳光明媚，很适合出去走走。",
+      sender: "小萱",
+      message: "嗯，还有那句'冬の魔法に包まれる'，感觉就像是真的被冬天的魔法包围了一样。",
       isLeft: false,
       avatar: 'assets/avatar_b.png',
     ),
     ChatMessage(
-      sender: "用户A",
-      message: "你末有什么计划吗？",
+      sender: "忘忧",
+      message: "是啊，还有合唱部分，'ウィンター・ワンダーランド'，听起来就像是一个梦幻的景色。",
       isLeft: true,
       avatar: 'assets/avatar_a.png',
     ),
     ChatMessage(
-      sender: "用户B",
-      message: "我打算去公园野餐，你要一起来吗？",
+      sender: "小萱",
+      message: "而且那句'この瞬間、永遠に 心に刻まれて'，让人感觉这个美好的瞬间会被永远铭记在心。",
       isLeft: false,
       avatar: 'assets/avatar_b.png',
     ),
     ChatMessage(
-      sender: "用户A",
-      message: "听起来不错！需要我带些什么吗？",
+      sender: "忘忧",
+      message: "这首歌真的让人感受到了冬天的美丽和温暖，即使是在寒冷的天气里。",
       isLeft: true,
       avatar: 'assets/avatar_a.png',
     ),
     ChatMessage(
-      sender: "用户B",
-      message: "你可以带些水果或饮料，我来准备主食。",
+      sender: "小萱",
+      message: "没错，就像歌词中说的'手を取り合い歩く足跡 暖かい心が溶け合う'，让人感觉在冬天的寒冷中也能找到温暖。",
       isLeft: false,
       avatar: 'assets/avatar_b.png',
     ),
     ChatMessage(
-      sender: "用户A",
-      message: "好的，我带些苹果和橙汁。几点见面？",
+      sender: "忘忧",
+      message: "这首歌真是太棒了，让人对未来充满了希望和梦想。",
       isLeft: true,
       avatar: 'assets/avatar_a.png',
     ),
     ChatMessage(
-      sender: "用户B",
-      message: "上午10点如何？这个时间阳光正好。",
+      sender: "小萱",
+      message: "是的，就像歌词中说的'未来の光が輝く'，让人感觉未来充满了光明。",
       isLeft: false,
       avatar: 'assets/avatar_b.png',
     ),
@@ -206,59 +204,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return path;
   }
 
-  Future<bool> _requestPermissions() async {
-    if (Platform.isAndroid) {
-      // 获取 Android 版本
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
-      final androidVersion = androidInfo.version.sdkInt;
-
-      // 请求所有必要权限
-      final permissions = <Permission>[
-        Permission.microphone,
-        Permission.notification,
-        Permission.systemAlertWindow,
-      ];
-
-      // 根据 Android 版本添加存储权限
-      if (androidVersion >= 33) {
-        permissions.addAll([
-          Permission.videos,
-          Permission.audio,
-          Permission.photos,
-        ]);
-      } else {
-        permissions.add(Permission.storage);
-        // 对于 Android 10 及以上版本，请求管理所有文件的权限
-        if (androidVersion >= 29) {
-          permissions.add(Permission.manageExternalStorage);
-        }
-      }
-
-      // 请求所有权限
-      Map<Permission, PermissionStatus> statuses = await permissions.request();
-
-      // 检查是否所有权限都被授予
-      bool allGranted = true;
-      statuses.forEach((permission, status) {
-        print('Permission $permission: $status');
-        if (!status.isGranted) {
-          allGranted = false;
-        }
-      });
-
-      // 特别处理系统悬浮窗权限
-      if (!await Permission.systemAlertWindow.isGranted) {
-        await Permission.systemAlertWindow.request();
-      }
-
-      return allGranted;
-    }
-    return true;
-  }
-
   Future<void> _moveVideoToDownloads(String sourcePath) async {
     try {
-      print('Moving video from: $sourcePath');
+      print('Sharing video from: $sourcePath');
       final File sourceFile = File(sourcePath);
 
       if (!await sourceFile.exists()) {
@@ -266,68 +214,30 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
-      if (Platform.isAndroid) {
-        // Android 保存逻辑
-        final downloadDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadDir.exists()) {
-          await downloadDir.create(recursive: true);
-        }
+      // 使用 share_plus 分享视频文件
+      await Share.shareXFiles(
+        [XFile(sourcePath)],
+        text: '对话视频',
+      );
 
-        final String fileName = sourcePath.split('/').last;
-        final String destinationPath = '${downloadDir.path}/$fileName';
-
-        await sourceFile.copy(destinationPath);
-        await sourceFile.delete();
-      } else if (Platform.isIOS) {
-        // iOS 保存逻辑
-        final Uint8List videoBytes = await sourceFile.readAsBytes();
-        final result = await ImageGallerySaver.saveFile(
-          sourcePath,
-          name: "chat_video_${DateTime.now().millisecondsSinceEpoch}",
-          isReturnPathOfIOS: true,
-        );
-
-        print('iOS save result: $result');
-
-        if (result['isSuccess'] != true) {
-          throw Exception('Failed to save video to gallery');
-        }
-
-        // 清理源文件
-        await sourceFile.delete();
-      }
+      // 视频分享后删除临时文件
+      await sourceFile.delete();
 
       if (mounted) {
-        final String fileName = sourcePath.split('/').last;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 5),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('视频生成成功！'),
-                const SizedBox(height: 4),
-                Text(
-                  Platform.isAndroid ? '保存在手机的Download文件夹中' : '保存在相册中',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                if (Platform.isAndroid) ...[
-                  const SizedBox(height: 2),
-                  Text('文件名: $fileName', style: const TextStyle(fontSize: 12)),
-                ],
-              ],
-            ),
+          const SnackBar(
+            duration: Duration(seconds: 3),
+            content: Text('视频生成完成，请选择保存位置或分享方式'),
           ),
         );
       }
     } catch (e, stackTrace) {
-      print('Error moving video: $e');
+      print('Error sharing video: $e');
       print('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('保存视频失败: $e'),
+            content: Text('视��分享失败: $e'),
             duration: const Duration(seconds: 5),
           ),
         );
@@ -450,7 +360,7 @@ class _ChatScreenState extends State<ChatScreen> {
         double y = currentY;
         for (final layout in messageLayouts) {
           if (y + layout.height > 0 && y < frameHeight) {
-            // 调整基础x坐标，增加头像与气泡之间的间距
+            // 调��基础x坐标，增加头像与气泡之间的间距
             final baseX = layout.message.isLeft
                 ? 80.0 // 40(头像) + 40(间距)
                 : frameWidth -
@@ -538,14 +448,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
         // 更新进度
         setState(() {
-          _generationProgress = (frame + 1) / totalFrames * 0.8; // 帧生成占80%进度
-          _progressText = '生成帧 ${frame + 1}/$totalFrames';
+          _generationProgress = (frame + 1) / totalFrames * 0.8;
+          _progressText = '正在生成帧 ${frame + 1}/$totalFrames';
         });
       }
 
       setState(() {
         _progressText = '正在合成视频...';
-        _generationProgress = 0.8; // 开始FFmpeg处理
+        _generationProgress = 0.8;
       });
 
       // 3. 使用FFmpeg将图片序列转换为视频
@@ -558,16 +468,16 @@ class _ChatScreenState extends State<ChatScreen> {
         await outputDir.create(recursive: true);
       }
 
-      // 更新FFmpeg命令以用新的尺寸
+      // 使用 h264 编码器替代 libx264
       final command = '''
         -y \
         -f image2 \
         -framerate $frameRate \
         -i ${framesDir.path}/frame_%04d.png \
-        -c:v mpeg4 \
-        -q:v 1 \
-        -vf "scale=720:1280" \
+        -c:v h264 \
+        -b:v 2M \
         -pix_fmt yuv420p \
+        -vf "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2" \
         ${_currentVideoPath}
       '''
           .replaceAll(RegExp(r'\s+'), ' ')
@@ -589,7 +499,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (ReturnCode.isSuccess(returnCode)) {
         setState(() {
-          _progressText = '保存视频文件...';
+          _progressText = '处理完成...';
           _generationProgress = 0.9;
         });
 
@@ -606,22 +516,9 @@ class _ChatScreenState extends State<ChatScreen> {
           await _moveVideoToDownloads(_currentVideoPath!);
           final String fileName = _currentVideoPath!.split('/').last;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              duration: const Duration(seconds: 5),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('视频生成成功！'),
-                  const SizedBox(height: 4),
-                  Text(
-                    '保存在手机的Download文件夹中',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 2),
-                  Text('文件名: $fileName', style: const TextStyle(fontSize: 12)),
-                ],
-              ),
+            const SnackBar(
+              duration: Duration(seconds: 3),
+              content: Text('生成完成，请选择保存位置或分享方式'),
             ),
           );
         }
@@ -643,7 +540,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // 清理临时文件
       await framesDir.delete(recursive: true);
     } catch (e, stackTrace) {
-      print('Error in video generation process: $e');
+      print('视频生成过程中出错: $e');
       print('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -701,7 +598,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Column(
                           children: [
                             ListTile(
-                              title: const Text('左气泡颜色'),
+                              title: const Text('左侧气泡颜色'),
                               trailing: Container(
                                 width: 24,
                                 height: 24,
@@ -717,7 +614,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               },
                             ),
                             ListTile(
-                              title: const Text('右侧���泡颜色'),
+                              title: const Text('右侧气泡颜色'),
                               trailing: Container(
                                 width: 24,
                                 height: 24,
@@ -772,7 +669,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text('���泡圆角'),
+                                      const Text('气泡圆角'),
                                       Text(
                                           '${_bubbleRadius.toStringAsFixed(1)}'),
                                     ],
@@ -841,6 +738,35 @@ class _ChatScreenState extends State<ChatScreen> {
                                       setState(() => _senderFontSize =
                                           _clampSenderFontSize(value));
                                       setModalState(() {});
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('滚动速度'),
+                                      Text(
+                                          '${_animationSpeed.toStringAsFixed(1)}x'),
+                                    ],
+                                  ),
+                                  Slider(
+                                    value: _animationSpeed,
+                                    min: 0.5,
+                                    max: 2.0,
+                                    divisions: 15,
+                                    label:
+                                        '${_animationSpeed.toStringAsFixed(1)}x',
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _animationSpeed = value;
+                                      });
                                     },
                                   ),
                                 ],
@@ -932,7 +858,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 添加保存截图的方法
+  // 添加保存截图的��法
   Future<void> _saveScreenshot() async {
     try {
       // 获取设备像素比
@@ -945,73 +871,35 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       if (imageBytes != null) {
-        if (Platform.isAndroid) {
-          // Android 保存逻辑
-          final downloadDir = Directory('/storage/emulated/0/Download');
-          if (!await downloadDir.exists()) {
-            await downloadDir.create(recursive: true);
-          }
+        // 创建临时文件保存截图
+        final tempDir = await getTemporaryDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final tempFile = File('${tempDir.path}/screenshot_$timestamp.png');
+        await tempFile.writeAsBytes(imageBytes);
 
-          final String timestamp =
-              DateTime.now().millisecondsSinceEpoch.toString();
-          final String fileName = 'chat_screenshot_$timestamp.png';
-          final String filePath = '${downloadDir.path}/$fileName';
+        // 使用 share_plus 分享文件
+        await Share.shareXFiles(
+          [XFile(tempFile.path)],
+          text: '对话截图',
+        );
 
-          final File imageFile = File(filePath);
-          await imageFile.writeAsBytes(imageBytes);
-
-          if (mounted) {
-            _showSaveSuccessMessage(fileName, 'Download文件夹');
-          }
-        } else if (Platform.isIOS) {
-          // iOS 保存逻辑
-          final result = await ImageGallerySaver.saveImage(
-            imageBytes,
-            quality: 100,
-            name: "chat_screenshot_${DateTime.now().millisecondsSinceEpoch}",
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              duration: Duration(seconds: 3),
+              content: Text('截图生成完成，请选择保存位置或分享方式'),
+            ),
           );
-
-          if (mounted) {
-            if (result['isSuccess']) {
-              _showSaveSuccessMessage(null, '相册');
-            } else {
-              throw Exception('保存失败');
-            }
-          }
         }
       }
     } catch (e) {
-      print('截图保存失败: $e');
+      print('截图分享失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('截图保存失败: $e')),
+          SnackBar(content: Text('截图分享失败: $e')),
         );
       }
     }
-  }
-
-  void _showSaveSuccessMessage(String? fileName, String location) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 5),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('截图保存成功！'),
-            const SizedBox(height: 4),
-            Text(
-              '保存在$location中',
-              style: const TextStyle(fontSize: 12),
-            ),
-            if (fileName != null) ...[
-              const SizedBox(height: 2),
-              Text('文件名: $fileName', style: const TextStyle(fontSize: 12)),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 }
 
