@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 
 void main() {
   runApp(const MyApp());
@@ -256,53 +257,81 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _moveVideoToDownloads(String sourcePath) async {
-    if (!Platform.isAndroid) return;
-
     try {
-      print('Checking source file: $sourcePath');
+      print('Moving video from: $sourcePath');
       final File sourceFile = File(sourcePath);
 
-      // 检查文件是否存在
-      final bool exists = await sourceFile.exists();
-      print('Source file exists: $exists');
-
-      if (!exists) {
-        // 尝试列出源目录中的文件
-        final Directory sourceDir =
-            Directory(sourcePath.substring(0, sourcePath.lastIndexOf('/')));
-        print('Listing directory: ${sourceDir.path}');
-        final List<FileSystemEntity> files = await sourceDir.list().toList();
-        print('Files in directory:');
-        for (var file in files) {
-          print('  ${file.path}');
-        }
+      if (!await sourceFile.exists()) {
+        print('Source file does not exist');
         return;
       }
 
-      // 获取 Download 目录路径
-      final downloadDir = Directory('/storage/emulated/0/Download');
-      final bool downloadExists = await downloadDir.exists();
-      print('Download directory exists: $downloadExists');
+      if (Platform.isAndroid) {
+        // Android 保存逻辑
+        final downloadDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
 
-      if (!downloadExists) {
-        print('Creating download directory');
-        await downloadDir.create(recursive: true);
+        final String fileName = sourcePath.split('/').last;
+        final String destinationPath = '${downloadDir.path}/$fileName';
+
+        await sourceFile.copy(destinationPath);
+        await sourceFile.delete();
+      } else if (Platform.isIOS) {
+        // iOS 保存逻辑
+        final Uint8List videoBytes = await sourceFile.readAsBytes();
+        final result = await ImageGallerySaver.saveFile(
+          sourcePath,
+          name: "chat_video_${DateTime.now().millisecondsSinceEpoch}",
+          isReturnPathOfIOS: true,
+        );
+
+        print('iOS save result: $result');
+
+        if (result['isSuccess'] != true) {
+          throw Exception('Failed to save video to gallery');
+        }
+
+        // 清理源文件
+        await sourceFile.delete();
       }
 
-      final String fileName = sourcePath.split('/').last;
-      final String destinationPath = '${downloadDir.path}/$fileName';
-      print('Destination path: $destinationPath');
-
-      // 复制文件到 Download 目录
-      final File newFile = await sourceFile.copy(destinationPath);
-      print('File copied successfully: ${await newFile.exists()}');
-
-      // 删除源文件
-      await sourceFile.delete();
-      print('Source file deleted');
+      if (mounted) {
+        final String fileName = sourcePath.split('/').last;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 5),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('视频生成成功！'),
+                const SizedBox(height: 4),
+                Text(
+                  Platform.isAndroid ? '保存在手机的Download文件夹中' : '保存在相册中',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                if (Platform.isAndroid) ...[
+                  const SizedBox(height: 2),
+                  Text('文件名: $fileName', style: const TextStyle(fontSize: 12)),
+                ],
+              ],
+            ),
+          ),
+        );
+      }
     } catch (e, stackTrace) {
       print('Error moving video: $e');
       print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('保存视频失败: $e'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -347,7 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
       const frameWidth = 720.0; // 宽度设为720px
       const frameHeight = 1280.0; // 高度设为1280px，保持9:16比例
 
-      // 计算所有消息���总高度
+      // 计算所有消息总高度
       double totalHeight = 0;
       final List<_MessageLayout> messageLayouts = [];
 
@@ -522,7 +551,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // 3. 使用FFmpeg将图片序列转换为视频
       _currentVideoPath = await _getVideoSavePath();
 
-      // 确保输出目录存在
+      // 确保输出目存在
       final outputDir = Directory(
           _currentVideoPath!.substring(0, _currentVideoPath!.lastIndexOf('/')));
       if (!await outputDir.exists()) {
@@ -743,7 +772,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text('气泡圆角'),
+                                      const Text('���泡圆角'),
                                       Text(
                                           '${_bubbleRadius.toStringAsFixed(1)}'),
                                     ],
@@ -916,42 +945,39 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       if (imageBytes != null) {
-        // 获取下载目录
-        final downloadDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadDir.exists()) {
-          await downloadDir.create(recursive: true);
-        }
+        if (Platform.isAndroid) {
+          // Android 保存逻辑
+          final downloadDir = Directory('/storage/emulated/0/Download');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
 
-        // 生成文件名
-        final String timestamp =
-            DateTime.now().millisecondsSinceEpoch.toString();
-        final String fileName = 'chat_screenshot_$timestamp.png';
-        final String filePath = '${downloadDir.path}/$fileName';
+          final String timestamp =
+              DateTime.now().millisecondsSinceEpoch.toString();
+          final String fileName = 'chat_screenshot_$timestamp.png';
+          final String filePath = '${downloadDir.path}/$fileName';
 
-        // 保存文件
-        final File imageFile = File(filePath);
-        await imageFile.writeAsBytes(imageBytes);
+          final File imageFile = File(filePath);
+          await imageFile.writeAsBytes(imageBytes);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              duration: const Duration(seconds: 5),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('截图保存成功！'),
-                  const SizedBox(height: 4),
-                  Text(
-                    '保存在手机的Download文件夹中',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 2),
-                  Text('文件名: $fileName', style: const TextStyle(fontSize: 12)),
-                ],
-              ),
-            ),
+          if (mounted) {
+            _showSaveSuccessMessage(fileName, 'Download文件夹');
+          }
+        } else if (Platform.isIOS) {
+          // iOS 保存逻辑
+          final result = await ImageGallerySaver.saveImage(
+            imageBytes,
+            quality: 100,
+            name: "chat_screenshot_${DateTime.now().millisecondsSinceEpoch}",
           );
+
+          if (mounted) {
+            if (result['isSuccess']) {
+              _showSaveSuccessMessage(null, '相册');
+            } else {
+              throw Exception('保存失败');
+            }
+          }
         }
       }
     } catch (e) {
@@ -962,6 +988,30 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     }
+  }
+
+  void _showSaveSuccessMessage(String? fileName, String location) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 5),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('截图保存成功！'),
+            const SizedBox(height: 4),
+            Text(
+              '保存在$location中',
+              style: const TextStyle(fontSize: 12),
+            ),
+            if (fileName != null) ...[
+              const SizedBox(height: 2),
+              Text('文件名: $fileName', style: const TextStyle(fontSize: 12)),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

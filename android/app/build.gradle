@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace = "com.example.chat_video_generator"
+    namespace = "com.xiangshikeji.chat_video_generator"
     compileSdkVersion = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -42,7 +42,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.chat_video_generator"
+        applicationId "com.xiangshikeji.chat_video_generator"
         minSdk 24
         targetSdk flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
